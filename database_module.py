@@ -4,10 +4,14 @@ import os
 import psycopg2
 from pgvector.psycopg2 import register_vector
 from sentence_transformers import SentenceTransformer 
+import numpy as np
 
-# يتم سحب هذا الرابط تلقائياً من إعدادات خدمة PostgreSQL في Railway
-DB_URL = os.environ.get("DATABASE_URL") 
-# نموذج لغوي لإنشاء المتجهات (الحجم 384 يطابق تعريف الجدول)
+# ************** تم تعديل هذا السطر خصيصاً للفهرسة المحلية المؤقتة **************
+# عند الانتهاء من الفهرسة والدفع إلى GitHub، يجب إعادته إلى: DB_URL = os.environ.get("DATABASE_URL")
+DB_URL = "postgresql://postgres:EwUGqTGEqNMIZEGVApfkTpjLEwpbYRPR@postgres.railway.internal:5432/railway" 
+# ********************************************************************************
+
+# نموذج لغوي بسيط وفعّال لإنشاء المتجهات (الحجم 384)
 model = SentenceTransformer('all-MiniLM-L6-v2') 
 
 def get_db_connection():
@@ -21,7 +25,7 @@ def get_db_connection():
         return None
 
 def embed_text(text: str) -> list:
-    """تحويل النص إلى متجه رقمي (Vector)"""
+    """تحويل النص إلى متجه رقمي (Vector) للبحث الدلالي"""
     embedding = model.encode(text, convert_to_tensor=False)
     return embedding.tolist()
 
@@ -34,7 +38,6 @@ def get_book_by_semantic_search(query: str, limit: int = 5):
     query_vector = embed_text(query) # متجه استعلام البحث
     cur = conn.cursor()
 
-    # الاستعلام يستخدم عامل <-> (مسافة المتجهات) للعثور على أقرب تطابق دلالي
     query_sql = f"""
     SELECT title, author, telegram_message_id, summary
     FROM library_index
@@ -51,7 +54,6 @@ def get_book_by_semantic_search(query: str, limit: int = 5):
         
     conn.close()
     
-    # تحويل النتائج إلى قائمة قواميس
     books = []
     for row in results:
         books.append({
